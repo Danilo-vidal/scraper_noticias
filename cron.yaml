@@ -1,0 +1,16 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: g1-scraper-job
+spec:
+  schedule: "0 * * * *"  # A cada hora
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: g1-scraper
+              image: DANILO/g1-scraper:latest
+              command: ["python"]
+              args: ["scripts/g1_scraper.py"]
+          restartPolicy: OnFailure
