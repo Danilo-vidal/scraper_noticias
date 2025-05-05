@@ -1,0 +1,48 @@
+name: Coletar Informações dos Servidores Windows
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Diariamente às 06:00 da manhã
+  workflow_dispatch:
+
+jobs:
+  coletar-informacoes:
+    runs-on: [self-hosted, windows]
+    strategy:
+      matrix:
+        server: ['server01', 'server02', 'server03'] # Substitua pelos seus identificadores de runners
+
+    steps:
+      - name: Coletar e Salvar Informações
+        run: |
+          $Data = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+          $HostName = (systeminfo | findstr /B /C:"Nome do host").Split(':')[1].Trim()
+          $OS = (systeminfo | findstr /B /C:"Nome do sistema operacional").Split(':')[1].Trim()
+          $OSVersion = (systeminfo | findstr /B /C:"Versão do sistema operacional").Split(':')[1].Trim()
+          $DiskInfo = Get-PSDrive -PSProvider FileSystem | Where-Object {$_.Name -eq 'C'} | Select-Object @{Name='Espaco_Livre_GB';Expression={[math]::Round($_.Free/1GB,2)}}
+          $CPUUsage = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue
+          $Memoria = Get-CimInstance Win32_OperatingSystem
+          $TotalMemGB = [math]::Round($Memoria.TotalVisibleMemorySize / 1MB, 2)
+          $FreeMemGB = [math]::Round($Memoria.FreePhysicalMemory / 1MB, 2)
+          $SinacorVersion = Get-Content 'D:\sinacor\version.txt'
+
+          $Result = [PSCustomObject]@{
+            DataExecucao = $Data
+            HostName = $HostName
+            SO = $OS
+            Versao_SO = $OSVersion
+            EspacoLivre_C_GB = $DiskInfo.Espaco_Livre_GB
+            Uso_CPU_Percent = [math]::Round($CPUUsage, 2)
+            MemoriaTotal_GB = $TotalMemGB
+            MemoriaLivre_GB = $FreeMemGB
+            Versao_Sinacor = $SinacorVersion
+          }
+
+          $CSVPath = "D:\Monitoramento_Servidores.csv"
+
+          if (!(Test-Path $CSVPath)){
+            $Result | Export-Csv -Path $CSVPath -NoTypeInformation -Encoding UTF8
+          }
+          else{
+            $Result | Export-Csv -Path $CSVPath -Append -NoTypeInformation -Encoding UTF8
+          }
